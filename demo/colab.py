@@ -1,4 +1,4 @@
-# %%writefile /content/VibeVoice/demo/colab.py
+%%writefile /content/VibeVoice/demo/colab.py
 # Original Code: https://github.com/microsoft/VibeVoice/blob/main/demo/gradio_demo.py
 """
 VibeVoice Gradio Demo 
@@ -157,12 +157,20 @@ class VibeVoiceDemo:
     def load_model(self):
         """Load the VibeVoice model and processor."""
         print(f"Loading processor & model from {self.model_path}")
-        self.processor = VibeVoiceProcessor.from_pretrained(self.model_path)
-        self.model = VibeVoiceForConditionalGenerationInference.from_pretrained(
-            self.model_path,
-            torch_dtype=torch.bfloat16,
-            device_map='cuda',
-        )
+        self.processor = VibeVoiceProcessor.from_pretrained(self.model_path) 
+        if self.device == "cuda":
+            self.model = VibeVoiceForConditionalGenerationInference.from_pretrained(
+                self.model_path,
+                torch_dtype=torch.bfloat16,
+                device_map=self.device,
+            )
+        else:
+            self.model = VibeVoiceForConditionalGenerationInference.from_pretrained(
+                self.model_path,
+                torch_dtype=torch.float32,  # Use float32 for CPU
+                device_map="cpu",
+            )
+
         self.model.eval()
         self.model.model.noise_scheduler = self.model.model.noise_scheduler.from_config(
             self.model.model.noise_scheduler.config,
@@ -613,6 +621,7 @@ import click
 def main(model_path, inference_steps, debug, share):
     # model_path = "microsoft/VibeVoice-1.5B"
     model_folder = download_model(model_path, download_folder="./", redownload=False)
+    # model_folder=model_path
     device = "cuda" if torch.cuda.is_available() else "cpu"
     set_seed(42)
     print("🎙️ Initializing VibeVoice Demo with Timestamp Support...")
