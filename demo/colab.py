@@ -1,4 +1,4 @@
-%%writefile /content/VibeVoice/demo/colab.py
+# %%writefile /content/VibeVoice/demo/colab.py
 # Original Code: https://github.com/microsoft/VibeVoice/blob/main/demo/gradio_demo.py
 """
 VibeVoice Gradio Demo 
