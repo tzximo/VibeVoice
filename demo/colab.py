@@ -320,7 +320,7 @@ class VibeVoiceDemo:
                     audio_file.write(audio_int16)
 
                     timestamps[str(i + 1)] = {
-                        "text": text_content, "speaker_id": speaker_idx,
+                        "text": text_content, "speaker_id": speaker_idx+1,
                         "start": current_time, "end": current_time + duration
                     }
                     current_time += duration
