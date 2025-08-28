@@ -1,3 +1,4 @@
+# %%writefile /content/VibeVoice/demo/colab.py
 # Original Code: https://github.com/microsoft/VibeVoice/blob/main/demo/gradio_demo.py
 """
 VibeVoice Gradio Demo 
@@ -27,23 +28,25 @@ from vibevoice.modular.configuration_vibevoice import VibeVoiceConfig
 from vibevoice.modular.modeling_vibevoice_inference import VibeVoiceForConditionalGenerationInference, VibeVoiceGenerationOutput
 from vibevoice.processor.vibevoice_processor import VibeVoiceProcessor
 from vibevoice.modular.streamer import AudioStreamer
-from transformers.utils import logging
 from transformers import set_seed
 
-# New dependency for silence removal feature
-# Please install with: pip install pydub
-try:
-    from pydub import AudioSegment
-    from pydub.silence import split_on_silence
-    PYDUB_AVAILABLE = True
-except ImportError:
-    PYDUB_AVAILABLE = False
+from pydub import AudioSegment
+from pydub.silence import split_on_silence
 
+def drive_save(file_copy):
+    drive_path = "/content/gdrive/MyDrive"
+    save_folder = os.path.join(drive_path, "VibeVoice_Podcast")
 
-logging.set_verbosity_info()
-logger = logging.get_logger(__name__)
-
-# !pip install tqdm
+    if os.path.exists(drive_path):
+        print("Running on Google Colab and auto-saving to Google Drive...")
+        os.makedirs(save_folder, exist_ok=True)
+        dest_path = os.path.join(save_folder, os.path.basename(file_copy))
+        shutil.copy2(file_copy, dest_path)  # preserves metadata
+        print(f"File saved to: {dest_path}")
+        return dest_path
+    else:
+        print("Not running on Google Colab (or Google Drive not mounted). Skipping auto-save.")
+        return None
 
 import os, requests, urllib.request, urllib.error
 from tqdm.auto import tqdm
@@ -88,24 +91,6 @@ def download_file(url, download_file_path, redownload=False):
 
 
 def download_model(repo_id, download_folder="./", redownload=False):
-    # Download all files from a HuggingFace repo without HF_TOKEN using urllib.
-    """
-    In Google Colab, downloading models from Hugging Face can be unnecessarily frustrating.  
-    Even when a model is completely open-source and does NOT require a license agreement or token,  
-    Colab often forces you to provide a Hugging Face token anyway.  
-
-    That means you have to:  
-    1. Go to Hugging Face,  
-    2. Generate a Access Tokens, Enter Password,  
-    3. Paste it into Colab’s secret keys,  
-    4. Restart the runtime,  
-
-    all just to download a model that should be publicly accessible.  
-    It’s a waste of time and breaks the flow of experimentation.  
-
-    This function avoids that hassle by directly fetching the file list via the Hugging Face TOKEN  
-    and downloading the files with `aria2c`, no token required (unless the repo truly requires a license).  
-    """  
     # normalize empty string as current dir
     if not download_folder.strip():
         download_folder = "."
@@ -222,9 +207,6 @@ class VibeVoiceDemo:
 
     def trim_silence_from_numpy(self, audio_np: np.ndarray, sample_rate: int, silence_thresh: int = -45, min_silence_len: int = 100, keep_silence: int = 50) -> np.ndarray:
         """Removes silence from a NumPy audio array using pydub."""
-        if not PYDUB_AVAILABLE:
-            raise ImportError("pydub is not installed. Please run `pip install pydub` to use this feature.")
-        
         audio_int16 = (audio_np * 32767).astype(np.int16)
         sound = AudioSegment(
             data=audio_int16.tobytes(),
@@ -259,8 +241,6 @@ class VibeVoiceDemo:
 
             # --- Input Validation and Setup ---
             if not script.strip(): raise gr.Error("Error: Please provide a script.")
-            if remove_silence and not PYDUB_AVAILABLE:
-                raise gr.Error("Error: 'Trim Silence' is enabled, but pydub is not installed. Please run `pip install pydub`.")
             script = script.replace("’", "'")
             if not 1 <= num_speakers <= 4: raise gr.Error("Error: Number of speakers must be between 1 and 4.")
 
@@ -286,7 +266,6 @@ class VibeVoiceDemo:
             if not formatted_script_lines: raise gr.Error("Error: Script is empty after formatting.")
 
             # --- Prepare for Generation ---
-            log = f"🎙️ Starting generation for {len(formatted_script_lines)} lines...\n"
             timestamps = {}
             current_time = 0.0
             sample_rate = 24000
@@ -300,7 +279,6 @@ class VibeVoiceDemo:
             with sf.SoundFile(final_audio_path, 'w', samplerate=sample_rate, channels=1, subtype='PCM_16') as audio_file:
                 for i, line in enumerate(formatted_script_lines):
                     if self.stop_generation:
-                        log += "\n🛑 Generation stopped by user."
                         break
 
                     progress(i / total_lines, desc=f"Generating line {i+1}/{total_lines}")
@@ -312,7 +290,6 @@ class VibeVoiceDemo:
                     text_content = match.group(2).strip()
 
                     if speaker_idx < 0 or speaker_idx >= len(voice_samples):
-                        log += f"\n⚠️ Warning: Speaker ID {speaker_idx + 1} is out of bounds. Skipping line."
                         continue
 
                     inputs = self.processor(
@@ -328,10 +305,7 @@ class VibeVoiceDemo:
 
                     # NEW FEATURE: Remove silence if enabled
                     if remove_silence:
-                        original_duration = len(audio_np) / sample_rate
                         audio_np = self.trim_silence_from_numpy(audio_np, sample_rate)
-                        new_duration = len(audio_np) / sample_rate
-                        # log += f"✅ Line {i+1}: Trimmed from {original_duration:.2f}s to {new_duration:.2f}s\n"
 
                     duration = len(audio_np) / sample_rate
                     audio_int16 = (audio_np * 32767).astype(np.int16)
@@ -342,23 +316,27 @@ class VibeVoiceDemo:
                         "start": current_time, "end": current_time + duration
                     }
                     current_time += duration
-                    # log += f"✅ Line {i+1}: '{text_content[:30]}...' ({duration:.2f}s)\n"
 
             # --- Finalize and Save JSON ---
             progress(1.0, desc="Saving timestamp file...")
             with open(final_json_path, "w") as f:
                 json.dump(timestamps, f, indent=2)
+            try:
+              drive_save(final_audio_path)
+              drive_save(final_json_path)
+            except Exception as e:
+              print(f"Error saving files to Google Drive: {e}")
 
-            log += f"\n✨ Generation successful!\n🎵 Audio: {final_audio_path}\n📄 Timestamps: {final_json_path}\n"
+            print(f"\n✨ Generation successful!\n🎵 Audio: {final_audio_path}\n📄 Timestamps: {final_json_path}\n")
             self.is_generating = False
 
-            return final_audio_path, final_audio_path, final_json_path, log, gr.update(visible=True), gr.update(visible=False)
+            return final_audio_path, final_audio_path, final_json_path, gr.update(visible=True), gr.update(visible=False)
 
         except Exception as e:
             self.is_generating = False
-            error_msg = f"❌ An unexpected error occurred: {str(e)}"
+            print(f"❌ An unexpected error occurred: {str(e)}")
             traceback.print_exc()
-            return None, None, None, error_msg, gr.update(visible=True), gr.update(visible=False)
+            return None, None, None, gr.update(visible=True), gr.update(visible=False)
 
     def stop_audio_generation(self):
         if self.is_generating:
@@ -384,14 +362,13 @@ class VibeVoiceDemo:
 
 def create_demo_interface(demo_instance: VibeVoiceDemo):
     with gr.Blocks(
-        title="VibeVoice - AI Podcast Generator",
-        theme=gr.themes.Soft(primary_hue="blue", secondary_hue="purple", neutral_hue="slate")
+        title="VibeVoice AI Podcast Generator"
     ) as interface:
 
         gr.HTML("""
         <div style="text-align: center; margin: 20px auto; max-width: 800px;">
             <h1 style="font-size: 2.5em; margin-bottom: 5px;">🎙️ Vibe Podcasting</h1>
-            <p style="font-size: 1.2em; color: #555;">Generate Long-form Multi-speaker AI Podcasts with VibeVoice and Timestamps</p>
+            <p style="font-size: 1.2em; color: #555;">Generating Long-form Multi-speaker AI Podcast with VibeVoice</p>
         </div>
         """)
 
@@ -413,12 +390,12 @@ def create_demo_interface(demo_instance: VibeVoiceDemo):
 
                     with gr.Accordion("🎤 Upload Custom Voices", open=False):
                         upload_audio = gr.File(label="Upload Voice Samples", file_count="multiple", file_types=["audio"])
-                        process_upload_btn = gr.Button("Add Uploaded Voices to List")
+                        process_upload_btn = gr.Button("Add Uploaded Voices to Speaker Selection")
 
                     with gr.Accordion("⚙️ Advanced Settings", open=False):
                         cfg_scale = gr.Slider(minimum=1.0, maximum=2.0, value=1.3, step=0.05, label="CFG Scale")
                         # NEW FEATURE: Silence removal checkbox
-                        remove_silence_checkbox = gr.Checkbox(label="Trim Silence from Segments", value=False,)
+                        remove_silence_checkbox = gr.Checkbox(label="Trim Silence from Podcast", value=False,)
 
             # Right column - Generation
             with gr.Column(scale=2):
@@ -428,23 +405,20 @@ def create_demo_interface(demo_instance: VibeVoiceDemo):
 
                     with gr.Row():
                         random_example_btn = gr.Button("🎲 Random Example", scale=1)
-                        generate_btn = gr.Button("🚀 Generate Podcast & Timestamps", variant="primary", scale=2)
+                        generate_btn = gr.Button("🚀 Generate Podcast", variant="primary", scale=2)
 
                     stop_btn = gr.Button("🛑 Stop Generation", variant="stop", visible=False)
 
                     gr.Markdown("### 🎵 **Generated Output**")
-                    audio_output = gr.Audio(label="Play Generated Podcast", type="filepath")
+                    audio_output = gr.Audio(label="Play Generated Podcast")
                     with gr.Accordion("📦 Download Files", open=False):
                       download_file = gr.File(label="Download Audio File (.wav)")
                       json_file_output = gr.File(label="Download Timestamps (.json)")
-                      log_output = gr.Textbox(label="Generation Log", lines=8, interactive=False)
 
-        with gr.Accordion("💡 **Usage Tips & Examples**", open=True):
+        with gr.Accordion("💡 Usage Tips & Examples", open=True):
             gr.Markdown("""
-            - **Silence Trimming:** The 'Trim Silence' option in Advanced Settings can create a more tightly edited podcast. It requires the `pydub` library (`pip install pydub`).
-            - **Process:** Audio is generated line-by-line and written directly to a file. The UI updates only when generation is complete.
-            - **Playback & Download:** You can play the audio in the interface and get a separate link to download the file.
-            - **Output:** You get a playable audio file and a downloadable timestamp `.json` file.
+            - **Upload Your Own Voices:** Create your own podcast with custom voice samples.  
+            - **Timestamps:** Useful if you want to generate a video using Wan2.2 or other tools. The timestamps let you automatically separate each speaker (splitting the long podcast into smaller chunks), pass the audio clips to your video generation model, and then merge the generated video clips into a full podcast video (e.g., using FFmpeg + any video generation model such as image+audio → video).
             """)
             gr.Examples(examples=demo_instance.example_scripts, inputs=[num_speakers, script_input], label="Try these example scripts:")
 
@@ -472,7 +446,7 @@ def create_demo_interface(demo_instance: VibeVoiceDemo):
         ).then(
             fn=demo_instance.generate_podcast_with_timestamps,
             inputs=[num_speakers, script_input] + speaker_selections + [cfg_scale, remove_silence_checkbox],
-            outputs=[audio_output, download_file, json_file_output, log_output, generate_btn, stop_btn],
+            outputs=[audio_output, download_file, json_file_output, generate_btn, stop_btn],
         )
 
         stop_btn.click(fn=demo_instance.stop_audio_generation, cancels=[gen_event])
@@ -485,38 +459,181 @@ def create_demo_interface(demo_instance: VibeVoiceDemo):
 
     return interface
 
-def main():
-    """Main function to run the demo without command-line arguments."""
 
-    model_repo = "microsoft/VibeVoice-1.5B"
-    # big_model="WestZhang/VibeVoice-Large-pt"
-    model_folder=download_model(model_repo, download_folder="./", redownload=False)
-    inference_steps = 10
+
+import gradio as gr
+
+def build_conversation_prompt(topic, *speaker_names):
+    """
+    Generates the final prompt. It takes the topic and a variable number of speaker names.
+    """
+    names = [name for name in speaker_names if name and name.strip()]
+
+    # Error checking
+    if not topic or not topic.strip():
+        return "Error: Please provide a topic."
+    if not names:
+        return "Error: Please provide at least one speaker name."
+
+    num_speakers = len(names)
+    speaker_mapping_str = "Speaker mapping (for context only, DO NOT use these names as labels):\n"
+    for i, name in enumerate(names):
+        speaker_mapping_str += f"- Speaker {i+1} = {name}\n"
+    
+    speaker_labels = [f"\"Speaker {i+1}:\"" for i in range(num_speakers)]
+    
+    introductions_str = ""
+    for i, name in enumerate(names):
+        introductions_str += f"  - Speaker {i+1} introduces themselves by saying: \"I’m {name}...\"\n"
+        
+    example_str = "STRICT Example (follow this format exactly):\n"
+    example_str += f"Speaker 1: Hi everyone, I’m {names[0]}, and I’m excited to be here today.\n"
+    if num_speakers > 1:
+        for i in range(1, num_speakers):
+            example_str += f"Speaker {i+1}: And I’m {names[i]}. Thanks for joining us.\n"
+    example_str += "Speaker 1: So, let’s dive into our topic...\n"
+    
+    prompt = f"""
+You are a professional podcast scriptwriter. 
+Write a natural, engaging conversation between {num_speakers} speakers on the topic: "{topic}".
+
+{speaker_mapping_str}
+Formatting Rules:
+- You MUST always format dialogue with {', '.join(speaker_labels)} ONLY. 
+- Never replace the labels with real names. The labels stay exactly as they are.
+- At the beginning:
+{introductions_str}
+- During the conversation, they may occasionally mention each other's names ({', '.join(names)}) naturally in the dialogue, but the labels must remain unchanged.
+- Do not add narration, descriptions, or any extra formatting.
+
+{example_str}
+"""
+    return prompt
+
+def update_speaker_name_visibility(num_speakers):
+    """
+    Shows or hides the speaker name textboxes based on the slider value.
+    """
+    num = int(num_speakers)
+    updates = []
+    for i in range(4):
+        if i < num:
+            updates.append(gr.update(visible=True))
+        else:
+            updates.append(gr.update(visible=False, value=""))
+    
+    return tuple(updates) 
+
+def ui2():
+
+    with gr.Blocks(title="Prompt Builder") as demo:
+        gr.HTML("""
+        <div style="text-align: center; margin: 20px auto; max-width: 800px;">
+            <h1 style="font-size: 2.5em; margin-bottom: 5px;">🎙️ Sample Podcast Prompt Generator</h1>
+            <p style="font-size: 1.2em; color: #555;">Paste the prompt into any LLM, and customize the propmt if you want.</p>
+        </div>""")
+        
+        with gr.Row():
+            with gr.Column(scale=1):
+                topic = gr.Textbox(label="Topic", placeholder="e.g., The Future of Artificial Intelligence")
+                
+                num_speakers = gr.Slider(
+                    minimum=1, 
+                    maximum=4, 
+                    value=2, 
+                    step=1, 
+                    label="Number of Speakers"
+                )
+                
+                with gr.Group():
+                    speaker_textboxes = [
+                        gr.Textbox(label=f"Speaker {i+1} Name", visible=(i < 2), placeholder=f"e.g., Speaker {i+1}")
+                        for i in range(4)
+                    ]
+                
+                gen_btn = gr.Button("Generate Prompt", variant="primary")
+
+
+                gr.Examples(
+                    examples=[
+                        ["The Ethics of Gene Editing", 2, "Dr. Evelyn Reed", "Dr. Ben Carter", "", ""],
+                        ["Exploring the Deep Sea", 3, "Maria", "Leo", "Samira", ""],
+                        ["The Future of Space Tourism", 4, "Alex", "Zara", "Kenji", "Isla"]
+                    ],
+                    # The inputs list must match the order of items in the examples list
+                    inputs=[topic, num_speakers] + speaker_textboxes,
+                    label="Quick Examples"
+                )
+
+            with gr.Column(scale=2):
+                output_prompt = gr.Textbox(label="Generated Prompt", lines=25, interactive=False, show_copy_button=True)
+
+        
+        num_speakers.change(
+            fn=update_speaker_name_visibility, 
+            inputs=num_speakers, 
+            outputs=speaker_textboxes
+        )
+        
+        gen_btn.click(
+            fn=build_conversation_prompt, 
+            inputs=[topic] + speaker_textboxes, 
+            outputs=[output_prompt]
+        )
+
+    return demo
+
+
+import click
+@click.command()
+@click.option(
+    "--model_path",
+    default="microsoft/VibeVoice-1.5B",
+    help="Hugging Face Model Repo ID."
+)
+@click.option(
+    "--inference_steps",
+    default=10,
+    show_default=True,
+    type=int,
+    help="Number of inference steps for generation."
+)
+@click.option(
+    "--debug",
+    is_flag=True,
+    default=False,
+    help="Enable debug mode."
+)
+@click.option(
+    "--share",
+    is_flag=True,
+    default=False,
+    help="Enable sharing of the interface."
+)
+def main(model_path, inference_steps, debug, share):
+    # model_path = "microsoft/VibeVoice-1.5B"
+    model_folder = download_model(model_path, download_folder="./", redownload=False)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     set_seed(42)
     print("🎙️ Initializing VibeVoice Demo with Timestamp Support...")
-
-    if not PYDUB_AVAILABLE:
-        print("\n⚠️  Warning: `pydub` is not installed. The 'Trim Silence' feature will be disabled.")
-        print("   To enable it, please run: pip install pydub\n")
-
-
     demo_instance = VibeVoiceDemo(
         model_path=model_folder,
         device=device,
         inference_steps=inference_steps
     )
+    
+    custom_css = """
+      .gradio-container {
+          font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+      }"""
+    demo1 = create_demo_interface(demo_instance)
+    demo2=ui2()
+    demo = gr.TabbedInterface([demo1, demo2],["Vibe Podcasting","Generated Sample Podcast Script"],title="",theme=gr.themes.Soft(),css=custom_css)
 
-    interface = create_demo_interface(demo_instance)
-
-    print(f"🚀 Launching demo...")
-    try:
-        interface.queue().launch(
-            share=True,
-            debug=True
-        )
-    except Exception as e:
-        print(f"❌ Server error: {e}")
+    print("🚀 Launching Gradio Demo...")
+    demo.queue().launch(debug=debug, share=share)
 
 if __name__ == "__main__":
     main()
+
+# !python /content/VibeVoice/demo/colab.py --model_path microsoft/VibeVoice-1.5B --inference_steps 10 --debug --share    
