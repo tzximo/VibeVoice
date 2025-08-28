@@ -469,7 +469,6 @@ def create_demo_interface(demo_instance: VibeVoiceDemo):
 
 
 
-import gradio as gr
 
 def build_conversation_prompt(topic, *speaker_names):
     """
