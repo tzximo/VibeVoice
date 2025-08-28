@@ -628,7 +628,7 @@ def main(model_path, inference_steps, debug, share):
       }"""
     demo1 = create_demo_interface(demo_instance)
     demo2=ui2()
-    demo = gr.TabbedInterface([demo1, demo2],["Vibe Podcasting","Generated Sample Podcast Script"],title="",theme=gr.themes.Soft(),css=custom_css)
+    demo = gr.TabbedInterface([demo1, demo2],["Vibe Podcasting","Generate Sample Podcast Script"],title="",theme=gr.themes.Soft(),css=custom_css)
 
     print("🚀 Launching Gradio Demo...")
     demo.queue().launch(debug=debug, share=share)
