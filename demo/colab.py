@@ -624,7 +624,7 @@ def main(model_path, inference_steps, debug, share):
     # model_folder=model_path
     device = "cuda" if torch.cuda.is_available() else "cpu"
     set_seed(42)
-    print("🎙️ Initializing VibeVoice Demo with Timestamp Support...")
+    print("🎙️ Initializing VibeVoice ...")
     demo_instance = VibeVoiceDemo(
         model_path=model_folder,
         device=device,
