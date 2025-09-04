@@ -58,7 +58,7 @@ class VibeVoiceDemo:
             self.model_path,
             torch_dtype=torch.bfloat16,
             device_map='cuda',
-            attn_implementation="flash_attention_2",
+            # attn_implementation="flash_attention_2",  #we can't use this on T4 GPU
         )
         self.model.eval()
         
