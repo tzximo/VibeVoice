@@ -134,6 +134,7 @@ class VibeVoiceDemo:
                 self.model_path,
                 torch_dtype=torch.bfloat16,
                 device_map=self.device,
+                # attn_implementation="flash_attention_2",  #we can't use this on T4 GPU
             )
         else:
             self.model = VibeVoiceForConditionalGenerationInference.from_pretrained(
