@@ -311,7 +311,7 @@ def create_demo_interface(demo_instance: VibeVoiceDemo):
         <div style="text-align: center; margin: 20px auto; max-width: 800px;">
             <h1 style="font-size: 2.5em; margin-bottom: 10px;">🎙️ Vibe Podcasting</h1>
             <p style="font-size: 1.2em; color: #555; margin-bottom: 15px;">Generate Long-form Multi-speaker AI Podcasts with VibeVoice</p>
-            <a href="https://colab.research.google.com/github/NeuralFalconYT/AI-Podcast-Generator/blob/main/VibeVoice_Colab.ipynb" target="_blank" style="display: inline-block; padding: 10px 20px; background-color: #4285F4; color: white; border-radius: 6px; text-decoration: none; font-size: 1em;">🥳 Run on Google Colab</a>
+            <a href="https://github.com/tzximo/VibeVoice" target="_blank" style="display: inline-block; padding: 10px 20px; background-color: #4285F4; color: white; border-radius: 6px; text-decoration: none; font-size: 1em;">🥳 Run on Google Colab</a>
         </div>
         """)
         with gr.Row():
