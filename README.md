@@ -1,4 +1,4 @@
-**NOTE:-** This repo is forked from NeuralFalcon[https://colab.research.google.com/github/NeuralFalconYT/AI-Podcast-Generator/blob/main/VibeVoice_Colab.ipynb] (Github - NeuralFalcon[https://github.com/NeuralFalconYT/AI-Podcast-Generator]) which has forked from original Microsoft VibeVoice[https://github.com/microsoft/VibeVoice/tree/main].
+**NOTE:-** This repo is forked from [NeuralFalcon](https://colab.research.google.com/github/NeuralFalconYT/AI-Podcast-Generator/blob/main/VibeVoice_Colab.ipynb) (Github - [NeuralFalcon](https://github.com/NeuralFalconYT/AI-Podcast-Generator)) which has forked from original [Microsoft VibeVoice](https://github.com/microsoft/VibeVoice/tree/main).
 
 <div align="center">
 
